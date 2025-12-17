@@ -120,9 +120,122 @@ def backtracking_maze_generator(height: int, width: int):
             stack.pop()
 
     # Creat an entry and an exit
-    grid[0, 1] = 0 # Entry
+    # First we stock the possible entry and exit cells on each wall
 
-    grid[height-1, width-2] = 0 # Exit
+    doors_top = []
+    doors_bottom = []
+    doors_left = []
+    doors_right = []
+
+    # Top wall
+    for j in range(1, width - 1):
+        if grid[1, j] == 0:
+            doors_top.append((0, j))
+
+    # Bottom wall
+    for j in range(1, width - 1):
+        if grid[height - 2, j] == 0:
+            doors_bottom.append((height - 1, j))
+
+    # Left wall
+    for i in range(1, height - 1):
+        if grid[i, 1] == 0:
+            doors_left.append((i, 0))
+
+    # Right wall
+    for i in range(1, height - 1):
+        if grid[i, width - 2] == 0:
+            doors_right.append((i, width - 1))
+
+
+    # Select a random entry wall
+    walls = ["top", "bottom", "left", "right"]
+    entry_wall = random.choice(walls)
+
+    # Select the entry cell
+    if entry_wall == "top":
+        entry_cell = random.choice(doors_top)
+
+    elif entry_wall == "bottom":
+        entry_cell = random.choice(doors_bottom)
+
+    elif entry_wall == "left":
+        entry_cell = random.choice(doors_left)
+
+    elif entry_wall == "right":
+        entry_cell = random.choice(doors_right)
+
+    # Open the entry
+    grid[entry_cell] = 0
+
+
+    # Select the possible exit cells according to the entry wall
+    exit_candidates = []
+
+    # If entry is on the top wall
+    if entry_wall == "top":
+        # The exit can be anywhere on the bottom wall
+        exit_candidates.extend(doors_bottom)
+
+        # Or on the second half of the left and right walls
+        for cell in doors_left:
+            if cell[0] >= height // 2:
+                exit_candidates.append(cell)
+
+        for cell in doors_right:
+            if cell[0] >= height // 2:
+                exit_candidates.append(cell)
+
+    # If entry is on the bottom wall
+    elif entry_wall == "bottom":
+        exit_candidates.extend(doors_top)
+
+        for cell in doors_left:
+            if cell[0] <= height // 2:
+                exit_candidates.append(cell)
+
+        for cell in doors_right:
+            if cell[0] <= height // 2:
+                exit_candidates.append(cell)
+
+    # If entry is on the left wall
+    elif entry_wall == "left":
+        exit_candidates.extend(doors_right)
+
+        for cell in doors_top:
+            if cell[1] >= width // 2:
+                exit_candidates.append(cell)
+
+        for cell in doors_bottom:
+            if cell[1] >= width // 2:
+                exit_candidates.append(cell)
+
+    # If entry is on the right wall
+    elif entry_wall == "right":
+        exit_candidates.extend(doors_left)
+
+        for cell in doors_top:
+            if cell[1] <= width // 2:
+                exit_candidates.append(cell)
+
+        for cell in doors_bottom:
+            if cell[1] <= width // 2:
+                exit_candidates.append(cell)
+
+
+    # Remove the entry cell from exit candidates if needed
+    if entry_cell in exit_candidates:
+        exit_candidates.remove(entry_cell)
+
+    # Select the exit cell
+    exit_cell = random.choice(exit_candidates)
+
+    # Open the exit
+    grid[exit_cell] = 0
+
+    # grid[0, 1] = 0 # Entry
+
+    # grid[height-1, width-2] = 0 # Exit
 
     return grid
 
