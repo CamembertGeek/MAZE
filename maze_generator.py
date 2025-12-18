@@ -286,8 +286,99 @@ def add_loops(grid: np.array, loop_factor: float = 0.1):
 
     return loop_grid
 
-                
+def maze_solver(grid: np.array):
+    """
+    This function solve the maze and save the path.
 
+    PARAMETER:
+    ---------
+    grid : np.array
+        The maze grid.
+    
+    RETURN:
+    ------
+    solved_grid : np.array
+        The solved maze grid.
+    """
+    (height, width) = grid.shape
+
+    # First find the entry and exit of the maze on the border.
+    entry_exit = []
+
+    for i in range(width):
+        if grid[(0, i)] == 0: # Verification of the top border
+            entry_exit.append((0, i))
+
+        if grid[(-1, i)] == 0: # Verification of the bottom border
+            entry_exit.append((height-1, i))
+    
+    for i in range(1, height-1):
+        if grid[(i, 0)] == 0: # Verification of the left border
+            entry_exit.append((i, 0))
+        
+        if grid[(i, -1)] == 0: # Verification of the right border
+            entry_exit.append((i, width-1))
+
+     
+    # Find the path between the entry and the exit. For that we use a BFS methode.
+    entry_point = entry_exit[0] # We select our entry.
+    exit_point = entry_exit[1]
+
+    visited = set() # List of visited cell, start with the entry point.
+    visited.add(entry_point)
+
+    parent = {} # Dictionary use later to reconstruct the path.
+    parent[entry_point] = None
+
+    queue = [entry_point] # List of the cell to visit
+
+    found = False 
+
+    while queue and found is False:
+
+        current = queue.pop(0)
+        ni, nj = current
+
+        if current == exit_point:
+            found = True # The exit is found
+            break
+
+        for direction in [(-1, 0), (1, 0), (0, 1), (0, -1)]:
+            mi, mj = direction
+
+            ci = ni + mi
+            cj = nj + mj
+
+            neighbor = (ci, cj)
+
+            if 0 <= ci < height and 0 <= cj < width:
+                if grid[neighbor] == 0:
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        parent[neighbor] = current
+                        queue.append(neighbor)
+
+    if not found:
+        print(f"There is no solution to the maze.")
+
+
+    # Reconstruction of the path
+    path = []
+    node = exit_point
+
+    while node is not None:
+        path.append(node)
+        node = parent[node]
+
+    path.reverse()
+
+
+    # write the path on the grid
+    solved_grid = grid.copy()
+    for solved_cell in path:
+        solved_grid[solved_cell] = 2
+
+    return solved_grid
 
 
 def display_maze_ascii(grid:np.array):
@@ -311,8 +402,10 @@ def display_maze_ascii(grid:np.array):
         for cell in row:
             if cell == 1:
                 line += "█"
-            else:
+            elif cell == 0:
                 line += " "
+            elif cell == 2:
+                line += "£"
         ascii_grid.append(line)
 
     return ascii_grid
@@ -345,7 +438,7 @@ if __name__ == "__main__":
 
     backtraking_maze = backtracking_maze_generator(50, 51)
 
-    ascii_backtraking_maze = display_maze_ascii(backtraking_maze)
+    # ascii_backtraking_maze = display_maze_ascii(backtraking_maze)
     # for line in ascii_backtraking_maze:
     #     print(line)
 
@@ -354,7 +447,30 @@ if __name__ == "__main__":
 
 
     maze_with_loops = add_loops(backtraking_maze)
+
+    ascii_maze_with_loops = display_maze_ascii(maze_with_loops)
+    for line in ascii_maze_with_loops:
+         print(line)
+
     display_matplotlib_maze(maze_with_loops)
+
+
+
+
+    print(f"Solution")
+
+
+
+
+
+
+    solved_maze = maze_solver(maze_with_loops)
+
+    ascii_solved_maze = display_maze_ascii(solved_maze)
+    for line in ascii_solved_maze:
+         print(line)
+
+    display_matplotlib_maze(solved_maze)
 
     
     
