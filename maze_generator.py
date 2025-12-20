@@ -1,6 +1,7 @@
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import argparse
 
 
 def generate_maze(dim:int, p:float):
@@ -34,7 +35,7 @@ def generate_maze(dim:int, p:float):
 
     return init_grid
 
-def backtracking_maze_generator(height: int, width: int):
+def backtracking_maze_generator(height: int, width: int, output_path: str, grid_number: int):
     """
     This function generate a maze grid using backtracking.
     
@@ -44,6 +45,10 @@ def backtracking_maze_generator(height: int, width: int):
         The height of the grid.
     width : int
         The width of the grid.
+    output_path : str
+        Path to the saving directory.
+    grid_number : int
+        The grid number, used to find the corresponding solved grid. 
     
     RETURN:
     ------
@@ -56,7 +61,7 @@ def backtracking_maze_generator(height: int, width: int):
     if width % 2 == 0:
         width += 1
 
-    grid = np.ones(shape=(height, width), dtype=int)
+    grid = np.ones(shape=(height, width), dtype=np.uint8)
 
     starting_point = (1,1)
 
@@ -233,11 +238,21 @@ def backtracking_maze_generator(height: int, width: int):
     # Open the exit
     grid[exit_cell] = 0
 
-    # grid[0, 1] = 0 # Entry
+    # Add of loops inside the grid
+    grid_with_loops = add_loops(grid)
 
-    # grid[height-1, width-2] = 0 # Exit
 
-    return grid
+    # Saving the grid with the entry and exit location.
+    file_path = output_path + f"/grid_{grid_number}.npz"
+
+    np.savez(
+        file_path,
+        grid=grid_with_loops,
+        entry=entry_cell,
+        exit=exit_cell
+    )
+
+    return grid_with_loops
 
 def add_loops(grid: np.array, loop_factor: float = 0.1):
     """
@@ -286,7 +301,7 @@ def add_loops(grid: np.array, loop_factor: float = 0.1):
 
     return loop_grid
 
-def maze_solver(grid: np.array):
+def maze_solver(grid: np.array, output_path: str, grid_number: int):
     """
     This function solve the maze and save the path.
 
@@ -294,6 +309,10 @@ def maze_solver(grid: np.array):
     ---------
     grid : np.array
         The maze grid.
+    output_path : str
+        Path to the output directory.
+    grid_number : int
+        The solved grid number, used to find the corresponding grid. 
     
     RETURN:
     ------
@@ -378,6 +397,21 @@ def maze_solver(grid: np.array):
     for solved_cell in path:
         solved_grid[solved_cell] = 2
 
+
+    # Create a mask with just the solution path.
+    mask_grid = np.zeros((height, width), dtype=np.uint8)
+    for cell in path:
+        mask_grid[cell] = 1
+        
+
+    # Saving the solution masked grid with the path.
+    file_path = output_path + f"/solved_grid_{grid_number}.npz"
+    
+    np.savez(
+        file_path,
+        solution=mask_grid
+        )
+
     return solved_grid
 
 
@@ -425,52 +459,37 @@ def display_matplotlib_maze(grid:np.array):
 
 if __name__ == "__main__":
 
-    # maze = generate_maze(10, 0.7)
-
-    # print(maze)
-
-    # ascii_maze = display_maze_ascii(maze)
-
-    # for line in ascii_maze:
-    #     print(line)
-
-    # display_matplotlib_maze(maze)
-
-    backtraking_maze = backtracking_maze_generator(50, 51)
-
-    # ascii_backtraking_maze = display_maze_ascii(backtraking_maze)
-    # for line in ascii_backtraking_maze:
-    #     print(line)
-
-    # display_matplotlib_maze(backtraking_maze)
+    # Aguments
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('grid_number', type=int) 
+    # args = parser.parse_args()
+    # grid_number = args.grid_number
+    
+    
+    # Saving path
+    grid_solution_output_path = "/home/louis/Documents/Programs/365/MAZE/Training/sol_grid"
+    grid_output_path = "/home/louis/Documents/Programs/365/MAZE/Training/grid"
 
 
+    # Creation of the maze
+    backtraking_maze = backtracking_maze_generator(100, 101, grid_output_path, 1)
 
-    maze_with_loops = add_loops(backtraking_maze)
+    # # To display the maze in ascii
+    # ascii_maze_with_loops = display_maze_ascii(backtraking_maze)
+    # for line in ascii_maze_with_loops:
+    #      print(line)
 
-    ascii_maze_with_loops = display_maze_ascii(maze_with_loops)
-    for line in ascii_maze_with_loops:
-         print(line)
-
-    display_matplotlib_maze(maze_with_loops)
-
-
-
-
-    print(f"Solution")
+    # # To display the maze in a plot
+    display_matplotlib_maze(backtraking_maze)
 
 
+    # Solve the maze
+    solved_maze = maze_solver(backtraking_maze, grid_solution_output_path, 1)
 
+    # # To display the solved maze in ascii
+    # ascii_solved_maze = display_maze_ascii(solved_maze)
+    # for line in ascii_solved_maze:
+    #      print(line)
 
-
-
-    solved_maze = maze_solver(maze_with_loops)
-
-    ascii_solved_maze = display_maze_ascii(solved_maze)
-    for line in ascii_solved_maze:
-         print(line)
-
+    # # To display the maze in a plot
     display_matplotlib_maze(solved_maze)
-
-    
-    
