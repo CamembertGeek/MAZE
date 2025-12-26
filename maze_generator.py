@@ -243,7 +243,7 @@ def backtracking_maze_generator(height: int, width: int, output_path: str, grid_
 
 
     # Saving the grid with the entry and exit location.
-    file_path = output_path + f"/grid_{grid_number}.npz"
+    file_path = output_path + f"/grid_{grid_number:06d}.npz"
 
     np.savez(
         file_path,
@@ -405,7 +405,7 @@ def maze_solver(grid: np.array, output_path: str, grid_number: int):
         
 
     # Saving the solution masked grid with the path.
-    file_path = output_path + f"/solved_grid_{grid_number}.npz"
+    file_path = output_path + f"/solved_grid_{grid_number:06d}.npz"
     
     np.savez(
         file_path,
@@ -460,10 +460,10 @@ def display_matplotlib_maze(grid:np.array):
 if __name__ == "__main__":
 
     # Aguments
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument('grid_number', type=int) 
-    # args = parser.parse_args()
-    # grid_number = args.grid_number
+    parser = argparse.ArgumentParser()
+    parser.add_argument('grid_number', type=int) 
+    args = parser.parse_args()
+    gd_number = args.grid_number
     
     
     # Saving path
@@ -472,7 +472,7 @@ if __name__ == "__main__":
 
 
     # Creation of the maze
-    backtraking_maze = backtracking_maze_generator(100, 101, grid_output_path, 1)
+    backtraking_maze = backtracking_maze_generator(100, 101, grid_output_path, gd_number)
 
     # # To display the maze in ascii
     # ascii_maze_with_loops = display_maze_ascii(backtraking_maze)
@@ -480,11 +480,11 @@ if __name__ == "__main__":
     #      print(line)
 
     # # To display the maze in a plot
-    display_matplotlib_maze(backtraking_maze)
+    # display_matplotlib_maze(backtraking_maze)
 
 
     # Solve the maze
-    solved_maze = maze_solver(backtraking_maze, grid_solution_output_path, 1)
+    solved_maze = maze_solver(backtraking_maze, grid_solution_output_path, gd_number)
 
     # # To display the solved maze in ascii
     # ascii_solved_maze = display_maze_ascii(solved_maze)
@@ -492,4 +492,4 @@ if __name__ == "__main__":
     #      print(line)
 
     # # To display the maze in a plot
-    display_matplotlib_maze(solved_maze)
+    # display_matplotlib_maze(solved_maze)
