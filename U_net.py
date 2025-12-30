@@ -241,8 +241,25 @@ class Unet(nn.Module):
     def evaluate(self):
         pass
 
-    def save_model(self):
-        pass
+    def save_model(self, path: str = "model.pth"):
+        """
+        Save the model weights to a file.
+    
+        PARAMETERS:
+        -----------
+        path : str
+            Path to the output file (default: 'model.pth')
+        """
+        torch.save(self.state_dict(), path)
         
-    def load_model(self):
-        pass
+    def load_model(self, path: str):
+        """
+        Load model weights from a file.
+    
+        PARAMETERS:
+        -----------
+        path : str
+            Path to the file where weights were saved
+        """
+        self.load_state_dict(torch.load(path, map_location=self.device))
+        self.to(self.device)
