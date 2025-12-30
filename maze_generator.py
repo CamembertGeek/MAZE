@@ -245,12 +245,12 @@ def backtracking_maze_generator(height: int, width: int, output_path: str, grid_
     # Saving the grid with the entry and exit location.
     file_path = output_path + f"/grid_{grid_number:06d}.npz"
 
-    np.savez(
-        file_path,
-        grid=grid_with_loops,
-        entry=entry_cell,
-        exit=exit_cell
-    )
+    # np.savez(
+    #     file_path,
+    #     grid=grid_with_loops,
+    #     entry=entry_cell,
+    #     exit=exit_cell
+    # )
 
     return grid_with_loops
 
@@ -407,10 +407,10 @@ def maze_solver(grid: np.array, output_path: str, grid_number: int):
     # Saving the solution masked grid with the path.
     file_path = output_path + f"/solved_grid_{grid_number:06d}.npz"
     
-    np.savez(
-        file_path,
-        solution=mask_grid
-        )
+    # np.savez(
+    #     file_path,
+    #     solution=mask_grid
+    #     )
 
     return solved_grid
 
