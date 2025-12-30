@@ -2,6 +2,12 @@ import numpy as np
 import torch
 from torch import nn
 
+"""
+Note:
+The UNet model was introduced in the paper “U-Net: Convolutional Networks for Biomedical
+Image Segmentation” by Olaf Ronneberger, Philipp Fischer, and Thomas Brox.
+"""
+
 class Unet(nn.Module):
     """
     U neural network
@@ -98,7 +104,7 @@ class Unet(nn.Module):
         self.learning_rate = learning_rate
         self.device = device
 
-        self.model = self._build_model()
+        self._build_model()
 
         self.to(self.device)
 
@@ -109,10 +115,58 @@ class Unet(nn.Module):
 
 
 
-
+    def double_conv(self, in_channel, out_channel):
+        conv_op = nn.Sequential(
+            nn.Conv2d(in_channels=in_channel, out_channels=out_channel, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=out_channel, out_channels=out_channel, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+        return conv_op
 
     def _build_model(self):
-        pass
+
+        self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Contracting path.
+        # Each convolution is applied twice.
+        self.down_convolution_1 = self.double_conv(self.n_input, 64)
+        self.down_convolution_2 = self.double_conv(64, 128)
+        self.down_convolution_3 = self.double_conv(128, 256)
+        self.down_convolution_4 = self.double_conv(256, 512)
+        self.down_convolution_5 = self.double_conv(512, 1024)
+
+        # Expanding path.
+        self.up_transpose_1 = nn.ConvTranspose2d(
+            in_channels=1024, out_channels=512,
+            kernel_size=2, 
+            stride=2)
+        
+        # Below, `in_channels` again becomes 1024 as we are concatinating.
+        self.up_convolution_1 = self.double_conv(1024, 512)
+        self.up_transpose_2 = nn.ConvTranspose2d(
+            in_channels=512, out_channels=256,
+            kernel_size=2, 
+            stride=2)
+        self.up_convolution_2 = self.double_conv(512, 256)
+        self.up_transpose_3 = nn.ConvTranspose2d(
+            in_channels=256, out_channels=128,
+            kernel_size=2, 
+            stride=2)
+        self.up_convolution_3 = self.double_conv(256, 128)
+        self.up_transpose_4 = nn.ConvTranspose2d(
+            in_channels=128, out_channels=64,
+            kernel_size=2, 
+            stride=2)
+        self.up_convolution_4 = self.double_conv(128, 64)
+
+        # output => `out_channels` as per the number of classes.
+        self.out = nn.Conv2d(
+            in_channels=64, out_channels=self.n_output, 
+            kernel_size=1
+        ) 
+
+        
 
     def get_loss_fcn(self):
         pass
@@ -121,7 +175,47 @@ class Unet(nn.Module):
         pass
 
     def forward(self, x):
-        pass
+
+        down_1 = self.down_convolution_1(x)
+
+        down_2 = self.max_pool2d(down_1)
+
+        down_3 = self.down_convolution_2(down_2)
+
+        down_4 = self.max_pool2d(down_3)
+
+        down_5 = self.down_convolution_3(down_4)
+
+        down_6 = self.max_pool2d(down_5)
+
+        down_7 = self.down_convolution_4(down_6)
+
+        down_8 = self.max_pool2d(down_7)
+
+        down_9 = self.down_convolution_5(down_8)        
+        # *** DO NOT APPLY MAX POOL TO down_9 ***
+        
+
+        up_1 = self.up_transpose_1(down_9)
+
+        x = self.up_convolution_1(torch.cat([down_7, up_1], 1))
+
+        up_2 = self.up_transpose_2(x)
+
+        x = self.up_convolution_2(torch.cat([down_5, up_2], 1))
+
+        up_3 = self.up_transpose_3(x)
+
+        x = self.up_convolution_3(torch.cat([down_3, up_3], 1))
+
+        up_4 = self.up_transpose_4(x)
+
+        x = self.up_convolution_4(torch.cat([down_1, up_4], 1))
+
+
+        out = self.out(x)
+
+        return out
 
     def get_optimizer(self):
         pass
