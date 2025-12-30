@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from torch import nn
+import torch.nn.functional as F
 
 """
 Note:
@@ -118,9 +119,9 @@ class Unet(nn.Module):
     def double_conv(self, in_channel, out_channel):
         conv_op = nn.Sequential(
             nn.Conv2d(in_channels=in_channel, out_channels=out_channel, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
+            self.get_activation_fcn(),
             nn.Conv2d(in_channels=out_channel, out_channels=out_channel, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True)
+            self.get_activation_fcn()
         )
         return conv_op
 
@@ -169,13 +170,50 @@ class Unet(nn.Module):
         
 
     def get_loss_fcn(self):
-        pass
+        """
+        Return the appropriate loss function based on self.loss_type.
+        """
+        if self.loss == "BCEWithLogitsLoss":
+            return nn.BCEWithLogitsLoss()
+        else:
+            raise NotImplementedError(f"Loss '{self.loss}' is not implemented.")
 
     def get_activation_fcn(self):
-        pass
+        return getattr(nn, self.activation_fcn)()
 
     def forward(self, x):
+        """
+        PARAMETER:
+        ---------
+        x : torch tensor
+            (B, C_in, H, W) with H=100, W=101 here
 
+        RETURN:
+        ------
+        (B, C_out, H, W) (Final crop to comming back to the original shape)
+        """
+
+        # The shape of the grid is 100 x 101 but we need a multiple of 16.
+        # We will add a padding at the begginig and a cropat the end.
+
+        # PAD to a multiple of 16
+        B, C, H0, W0 = x.shape
+        mult = 16  # = 2**4 because we have 4 maxpool (downsampling x2)
+
+        pad_h = (mult - (H0 % mult)) % mult
+        pad_w = (mult - (W0 % mult)) % mult
+
+        pad_top = pad_h // 2
+        pad_bottom = pad_h - pad_top
+        pad_left = pad_w // 2
+        pad_right = pad_w - pad_left
+
+        if pad_h != 0 or pad_w != 0:
+            # order F.pad : (left, right, top, bottom)
+            x = F.pad(x, (pad_left, pad_right, pad_top, pad_bottom),
+                    mode="constant", value=0.0)
+
+        # U-NET
         down_1 = self.down_convolution_1(x)
 
         down_2 = self.max_pool2d(down_1)
@@ -213,7 +251,11 @@ class Unet(nn.Module):
         x = self.up_convolution_4(torch.cat([down_1, up_4], 1))
 
 
-        out = self.out(x)
+        out = self.out(x) # logits
+
+        # CROP to come back to (H0, W0)
+        if pad_h != 0 or pad_w != 0:
+            out = out[..., pad_top:pad_top + H0, pad_left:pad_left + W0]
 
         return out
 
