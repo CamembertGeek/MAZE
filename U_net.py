@@ -319,11 +319,11 @@ class Unet(nn.Module):
 
         history = []
 
-        for epoch in range(1 + epochs + 1):
+        for epoch in range(1, epochs + 1):
             self.train()
 
             total_loss = 0.0
-            n_batch = 0.0
+            n_batches = 0.0
             dice_sum = 0.0
             iou_sum = 0.0
 
@@ -340,6 +340,8 @@ class Unet(nn.Module):
                 if grad_clip is not None:
                     nn.utils.clip_grad_norm_(self.parameters(), grad_clip)
 
+                self.optimizer.step()
+
                 metrics = self.compute_metrics(logits.detach(), y, threshold=threshold)
 
                 total_loss += float(loss.item())
@@ -347,7 +349,7 @@ class Unet(nn.Module):
                 iou_sum += metrics["iou"]
                 n_batches += 1
 
-                train_stats = {
+            train_stats = {
                 "epoch": epoch,
                 "train_loss": total_loss / max(n_batches, 1),
                 "train_dice": dice_sum / max(n_batches, 1),
@@ -398,8 +400,44 @@ class Unet(nn.Module):
 
         return self.loss_fcn(logits, targets)
 
-    def validate_epoch(self, loader):
-        pass
+    @torch.no_grad()
+    def validate_epoch(self, loader, threshold=0.5):
+        """
+        Run validation loop on a dataloader.
+
+        RETURNS:
+        --------
+        dict: {'loss': ..., 'dice': ..., 'iou': ...}
+        """
+        self.eval()
+
+        total_loss = 0.0
+        n_batches = 0
+        dice_sum = 0.0
+        iou_sum = 0.0
+
+        for x, y in loader:
+            x = x.to(self.device, non_blocking=True)
+            y = y.to(self.device, non_blocking=True)
+
+            logits = self(x)
+            loss = self.compute_loss(logits, y)
+
+            metrics = self.compute_metrics(logits, y, threshold=threshold)
+
+            total_loss += float(loss.item())
+            dice_sum += metrics["dice"]
+            iou_sum += metrics["iou"]
+            n_batches += 1
+
+        if n_batches == 0:
+            return {"loss": float("nan"), "dice": float("nan"), "iou": float("nan")}
+
+        return {
+            "loss": total_loss / n_batches,
+            "dice": dice_sum / n_batches,
+            "iou": iou_sum / n_batches,
+        }
 
     @torch.no_grad()
     def predict_proba(self, x):
