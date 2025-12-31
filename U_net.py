@@ -1,4 +1,3 @@
-import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -260,35 +259,195 @@ class Unet(nn.Module):
         return out
 
     def get_optimizer(self):
-        pass
+        """
+        Return optimizer instance.
+        """
+        return torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
 
-    def compute_metrics(self):
-        pass
+    def compute_metrics(self, logits, targets, threshold=0.5, eps=1e-7):
+        """
+        Compute simple segmentation metrics (Dice + IoU) on a batch.
 
-    def train_model(self):
-        pass
+        We apply sigmoid on logits -> probabilities -> threshold -> binary mask.
 
-    def compute_loss(self):
-        pass
+        RETURNS:
+        --------
+        dict with 'dice' and 'iou'
+        """
+        if targets.dtype != torch.float32:
+            targets = targets.float()
+
+        probs = torch.sigmoid(logits)
+        preds = (probs >= threshold).float()
+
+        # Flatten per sample (and per channel)
+        # shape: (B, C, H*W)
+        preds_f = preds.flatten(start_dim=2)
+        targets_f = targets.flatten(start_dim=2)
+
+        intersection = (preds_f * targets_f).sum(dim=2)          # (B, C)
+        pred_sum = preds_f.sum(dim=2)                             # (B, C)
+        target_sum = targets_f.sum(dim=2)                         # (B, C)
+        union = pred_sum + target_sum - intersection              # (B, C)
+
+        dice = (2.0 * intersection + eps) / (pred_sum + target_sum + eps)
+        iou = (intersection + eps) / (union + eps)
+
+        # Average on batch + canaux
+        return {
+            "dice": float(dice.mean().item()),
+            "iou": float(iou.mean().item()),
+        }
+
+    def train_model(self, train_loader, val_loader=None, epochs=10, threshold=0.5, grad_clip=0.1, verbose=True):
+        """
+        Train loop.
+
+        PARAMETERS:
+        ----------
+        train_loader : DataLoader
+        val_loader : DataLoader or None
+        epochs : int
+        threshold : float (for metrics)
+        grad_clip : float or None
+        verbose : bool
+
+        RETURNS:
+        --------
+        history : list of dicts (train/val stats)
+        """
+
+        history = []
+
+        for epoch in range(1 + epochs + 1):
+            self.train()
+
+            total_loss = 0.0
+            n_batch = 0.0
+            dice_sum = 0.0
+            iou_sum = 0.0
+
+            for x, y in train_loader:
+                x = x.to(self.device, non_blocking=True)
+                y = y.to(self.device, non_blocking=True)
+
+                logits = self(x)
+                loss = self.compute_loss(logits=logits, targets=y)
+
+                self.optimizer.zero_grad(set_to_none=True)
+                loss.backward()
+
+                if grad_clip is not None:
+                    nn.utils.clip_grad_norm_(self.parameters(), grad_clip)
+
+                metrics = self.compute_metrics(logits.detach(), y, threshold=threshold)
+
+                total_loss += float(loss.item())
+                dice_sum += metrics["dice"]
+                iou_sum += metrics["iou"]
+                n_batches += 1
+
+                train_stats = {
+                "epoch": epoch,
+                "train_loss": total_loss / max(n_batches, 1),
+                "train_dice": dice_sum / max(n_batches, 1),
+                "train_iou": iou_sum / max(n_batches, 1),
+            }
+
+            if val_loader is not None:
+                val_stats = self.validate_epoch(val_loader, threshold=threshold)
+                train_stats.update({
+                    "val_loss": val_stats["loss"],
+                    "val_dice": val_stats["dice"],
+                    "val_iou": val_stats["iou"],
+                })
+
+            history.append(train_stats)
+
+            if verbose:
+                if val_loader is None:
+                    print(f"Epoch {epoch:03d} | loss={train_stats['train_loss']:.4f} | dice={train_stats['train_dice']:.4f} | iou={train_stats['train_iou']:.4f}")
+                else:
+                    print(
+                        f"Epoch {epoch:03d} | "
+                        f"train loss={train_stats['train_loss']:.4f}, dice={train_stats['train_dice']:.4f}, iou={train_stats['train_iou']:.4f} | "
+                        f"val loss={train_stats['val_loss']:.4f}, dice={train_stats['val_dice']:.4f}, iou={train_stats['val_iou']:.4f}"
+                    )
+
+        return history
+
+    def compute_loss(self, logits, targets):
+        """
+        Compute the loss from logits and targets.
+
+        PARAMETERS:
+        ----------
+        logits : torch.Tensor
+            (B, C_out, H, W) - output of the network (logits)
+        targets : torch.Tensor
+            (B, C_out, H, W) - ground truth mask (0/1) float
+        
+        RETURN:
+        ------
+        torch.Tensor : scalar loss
+        """
+
+        # Security : BCEWithLogitsLoss is waiting for a float.
+        if targets.dtype != torch.float32:
+            targets = targets.float()
+
+        return self.loss_fcn(logits, targets)
 
     def validate_epoch(self, loader):
         pass
 
-    def predict_proba(self):
-        pass
+    @torch.no_grad()
+    def predict_proba(self, x):
+        """
+        Predict probabilities (sigmoid(logits)).
+
+        PARAMETER:
+        ---------
+        x : torch.Tensor (B, C_in, H, W)
+
+        RETURN:
+        ------ 
+        torch.Tensor (B, C_out, H, W) in [0,1]
+        """
+        self.eval()
+
+        x = x.to(self.device, non_blocking=True)
+        logits = self(x)
+
+        return torch.sigmoid(logits)
         
-    def predict(self):
-        pass
+    @torch.no_grad()
+    def predict(self, x, threshold=0.5):
+        """
+        Predict binary mask with a threshold.
+
+        RETURN:
+        ------ 
+        torch.Tensor float {0,1} (B, C_out, H, W)
+        """
+        probs = self.predict_proba(x)
+
+        return (probs >= threshold).float()
         
-    def evaluate(self):
-        pass
+    @torch.no_grad()
+    def evaluate(self, loader, threshold=0.5):
+        """
+        Alias of validate_epoch (same metrics).
+        """
+
+        return self.validate_epoch(loader, threshold=threshold)
 
     def save_model(self, path: str = "model.pth"):
         """
         Save the model weights to a file.
     
-        PARAMETERS:
-        -----------
+        PARAMETER:
+        ----------
         path : str
             Path to the output file (default: 'model.pth')
         """
@@ -298,8 +457,8 @@ class Unet(nn.Module):
         """
         Load model weights from a file.
     
-        PARAMETERS:
-        -----------
+        PARAMETER:
+        ----------
         path : str
             Path to the file where weights were saved
         """
