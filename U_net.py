@@ -37,7 +37,7 @@ class Unet(nn.Module):
         learning rate : float
             Learning rate use for the training.
         device : str
-            Type of device used for the training, 'cpu' or 'CUDA' (for gpu support).
+            Type of device used for the training, 'cpu' or 'cuda' (for gpu support).
 
         Architecture of the U-net:
         --------------------------
